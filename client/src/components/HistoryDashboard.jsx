@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { detectScriptBadge, formatDuration } from '../utils/audio.js';
 
 const TTS_VOICES = [
-  { code: 'hi-IN', label: 'HI · hi-IN' },
-  { code: 'en-IN', label: 'EN · en-IN' },
-  { code: 'en-US', label: 'US · en-US' },
+  { code: 'hi-IN', label: 'hi-IN' },
+  { code: 'en-IN', label: 'en-IN' },
+  { code: 'en-US', label: 'en-US' },
 ];
 
 function formatDate(isoString) {
@@ -90,7 +90,7 @@ export default function HistoryDashboard({
     try {
       await navigator.clipboard.writeText(item.content);
       setCopiedId(item.id);
-      onNotify('Transcript copied to clipboard.', 'success');
+      onNotify('Copied transcript to clipboard.', 'success');
       setTimeout(() => {
         setCopiedId((prev) => (prev === item.id ? null : prev));
       }, 1500);
@@ -117,244 +117,242 @@ export default function HistoryDashboard({
 
   return (
     <section className="lg:col-span-7 space-y-4">
-      <div className="editorial-card rounded-xl overflow-hidden">
-        {/* Vault Header */}
-        <div className="px-5 py-3.5 border-b border-[#D6CFC2] bg-[#FAF7F0] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="font-mono-tech text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded bg-[#E04428] text-white">
-              VAULT
-            </span>
-            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-[#171614]">
-              Archival Transcripts &amp; TTS Playback
-            </h2>
+      <div className="obsidian-panel rounded-2xl p-5 space-y-4">
+        {/* Header & Metrics */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34D399]" />
+              <h2 className="text-sm font-semibold tracking-wide text-white uppercase">
+                Transcription Vault
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Searchable PostgreSQL history with native browser TTS playback.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3 font-mono-tech text-[11px] text-[#656057]">
-            <span>{transcriptions.length} CLIPS</span>
-            <span>/</span>
-            <span>{formatDuration(totalSeconds)} TOTAL</span>
-            <span>/</span>
-            <span>{bilingualCount} BILINGUAL</span>
+          <div className="flex items-center gap-2 font-mono-lab text-[11px]">
+            <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-300">
+              {transcriptions.length} saved
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-slate-300">
+              {formatDuration(totalSeconds)}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/25 text-amber-300">
+              {bilingualCount} bilingual
+            </span>
           </div>
         </div>
 
-        <div className="p-5 space-y-4">
-          {/* Search + TTS Voice Selector Bar */}
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-1">
-              <div className="relative flex-1">
-                <svg
-                  className="w-4 h-4 text-[#656057] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                  />
-                </svg>
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder="Search archive by title, Hindi, or English keywords..."
-                  className="w-full rounded-md border border-[#C9C1B2] bg-white pl-9 pr-3 py-2 text-sm text-[#171614] placeholder:text-[#A39C8F] focus:outline-none focus:border-[#171614]"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={onRefresh}
-                className="font-mono-tech text-xs font-semibold uppercase px-3 py-2 rounded-md border border-[#C9C1B2] bg-[#F5F2EB] text-[#171614] hover:bg-[#EAE4D7] cursor-pointer"
+        {/* Search & TTS Voice Bar */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1">
+              <svg
+                className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
               >
-                Sync
-              </button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                />
+              </svg>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Filter by title, Hindi, or English text..."
+                className="w-full rounded-xl border border-white/10 bg-[#0C0F14] pl-10 pr-3.5 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/60 focus:ring-1 focus:ring-cyan-400/30 transition"
+              />
             </div>
-
-            {/* Segmented TTS Voice Deck */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-mono-tech text-[10px] font-semibold uppercase tracking-wider text-[#656057] mr-1">
-                TTS VOICE:
-              </span>
-              {TTS_VOICES.map((voice) => {
-                const active = ttsLang === voice.code;
-                return (
-                  <button
-                    key={voice.code}
-                    type="button"
-                    onClick={() => setTtsLang(voice.code)}
-                    className={`font-mono-tech text-[11px] font-medium px-2.5 py-1.5 rounded-md border transition cursor-pointer ${
-                      active
-                        ? 'bg-[#171614] text-[#FDFBF7] border-[#171614]'
-                        : 'bg-[#F5F2EB] text-[#49453E] border-[#D6CFC2] hover:border-[#171614]'
-                    }`}
-                  >
-                    {voice.label}
-                  </button>
-                );
-              })}
-
-              {activeTtsId !== null && (
-                <button
-                  type="button"
-                  onClick={stopSpeech}
-                  className="font-mono-tech text-[11px] font-semibold uppercase px-2.5 py-1.5 rounded-md bg-[#E04428] text-white hover:bg-[#C3361C] cursor-pointer"
-                >
-                  Stop Audio
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="px-3 py-2 rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white text-xs font-medium transition cursor-pointer"
+            >
+              Refresh
+            </button>
           </div>
 
-          {/* Saved Transcript Index Cards */}
-          <div className="space-y-3">
-            {loading ? (
-              <div className="rounded-md border border-dashed border-[#C9C1B2] py-12 text-center font-mono-tech text-xs text-[#656057]">
-                LOADING ARCHIVE FROM NEON POSTGRESQL...
-              </div>
-            ) : error ? (
-              <div className="rounded-md border border-[#E04428] bg-[#E04428]/10 p-4 text-sm text-[#9B230E]">
-                {error}
-              </div>
-            ) : transcriptions.length === 0 ? (
-              <div className="rounded-md border border-dashed border-[#C9C1B2] bg-[#FAF7F0] py-14 px-6 text-center space-y-1.5">
-                <div className="font-display text-sm font-bold text-[#171614]">
-                  No Archived Tapes Yet
-                </div>
-                <p className="text-xs text-[#656057]">
-                  Record multilingual speech in Deck A and click{' '}
-                  <strong className="text-[#171614]">Archive to DB</strong> to store it here.
-                </p>
-              </div>
-            ) : (
-              transcriptions.map((item) => {
-                const isPlaying = activeTtsId === item.id;
-                const isConfirmingDelete = confirmDeleteId === item.id;
-                const scriptBadge = detectScriptBadge(item.content);
-                const paddedId = String(item.id).padStart(3, '0');
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-mono-lab text-[10px] uppercase tracking-wider text-slate-500 mr-1">
+              TTS Voice
+            </span>
+            {TTS_VOICES.map((voice) => {
+              const active = ttsLang === voice.code;
+              return (
+                <button
+                  key={voice.code}
+                  type="button"
+                  onClick={() => setTtsLang(voice.code)}
+                  className={`font-mono-lab text-[11px] px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
+                    active
+                      ? 'bg-cyan-400/15 text-cyan-200 border-cyan-400/50'
+                      : 'bg-white/[0.03] text-slate-400 border-white/10 hover:border-white/25 hover:text-slate-200'
+                  }`}
+                >
+                  {voice.label}
+                </button>
+              );
+            })}
+            {activeTtsId !== null && (
+              <button
+                type="button"
+                onClick={stopSpeech}
+                className="font-mono-lab text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 cursor-pointer"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        </div>
 
-                return (
-                  <article
-                    key={item.id}
-                    className={`rounded-md border p-4 space-y-3 transition ${
-                      isPlaying
-                        ? 'border-[#E04428] bg-[#FFF8F5] shadow-[3px_3px_0px_#E04428]'
-                        : 'border-[#D6CFC2] bg-[#FFFFFF] hover:border-[#171614]'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono-tech text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[#EDE8DD] text-[#49453E]">
-                            #{paddedId}
-                          </span>
-                          <h3 className="font-display text-[15px] font-bold text-[#171614]">
-                            {item.title}
-                          </h3>
-                          {isPlaying && (
-                            <span className="inline-flex items-end gap-0.5 h-3.5 px-1.5 py-0.5 rounded bg-[#E04428]/10">
-                              <span className="w-0.5 h-full bg-[#E04428] tts-wave-bar" />
-                              <span
-                                className="w-0.5 h-full bg-[#E04428] tts-wave-bar"
-                                style={{ animationDelay: '0.15s' }}
-                              />
-                              <span
-                                className="w-0.5 h-full bg-[#E04428] tts-wave-bar"
-                                style={{ animationDelay: '0.3s' }}
-                              />
-                            </span>
-                          )}
-                        </div>
+        {/* History List */}
+        <div className="space-y-3">
+          {loading ? (
+            <div className="rounded-xl border border-dashed border-white/10 py-12 text-center font-mono-lab text-xs text-slate-500">
+              Loading saved transcripts...
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+              {error}
+            </div>
+          ) : transcriptions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-[#0C0F14]/60 py-14 px-6 text-center space-y-1.5">
+              <div className="text-sm font-medium text-slate-300">No transcriptions saved yet</div>
+              <p className="text-xs text-slate-500">
+                Capture speech on the left stage and click{' '}
+                <span className="text-emerald-300">Save to Database</span> to archive it here.
+              </p>
+            </div>
+          ) : (
+            transcriptions.map((item) => {
+              const isPlaying = activeTtsId === item.id;
+              const isConfirmingDelete = confirmDeleteId === item.id;
+              const scriptBadge = detectScriptBadge(item.content);
 
-                        <div className="flex flex-wrap items-center gap-2 font-mono-tech text-[11px] text-[#656057]">
-                          {scriptBadge && (
+              return (
+                <article
+                  key={item.id}
+                  className={`rounded-xl border p-4 space-y-3 transition ${
+                    isPlaying
+                      ? 'border-cyan-400/60 bg-cyan-500/[0.06] shadow-[0_0_24px_rgba(34,211,238,0.12)]'
+                      : 'border-white/[0.08] bg-[#0C0F14] hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono-lab text-[10px] px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-400">
+                          #{String(item.id).padStart(3, '0')}
+                        </span>
+                        <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                        {isPlaying && (
+                          <span className="inline-flex items-end gap-0.5 h-3.5 px-1.5 py-0.5 rounded bg-cyan-400/15">
+                            <span className="w-0.5 h-full bg-cyan-400 tts-eq-bar" />
                             <span
-                              className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${
-                                scriptBadge.tone === 'bilingual'
-                                  ? 'bg-[#E04428]/10 text-[#B92D14] border-[#E04428]/30'
-                                  : scriptBadge.tone === 'hindi'
-                                  ? 'bg-amber-500/15 text-amber-900 border-amber-500/30'
-                                  : 'bg-[#F5F2EB] text-[#49453E] border-[#D6CFC2]'
-                              }`}
-                            >
-                              {scriptBadge.label}
-                            </span>
-                          )}
-                          <span>{item.language_mode || 'Auto'}</span>
-                          <span>·</span>
-                          <span>{formatDuration(item.duration_seconds)}</span>
-                          <span>·</span>
-                          <span>{formatDate(item.created_at)}</span>
-                        </div>
+                              className="w-0.5 h-full bg-cyan-400 tts-eq-bar"
+                              style={{ animationDelay: '0.15s' }}
+                            />
+                            <span
+                              className="w-0.5 h-full bg-cyan-400 tts-eq-bar"
+                              style={{ animationDelay: '0.3s' }}
+                            />
+                          </span>
+                        )}
                       </div>
 
-                      {/* Tactile Card Actions */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleSpeak(item)}
-                          className={`font-mono-tech text-[11px] font-semibold uppercase px-2.5 py-1.5 rounded border transition cursor-pointer ${
-                            isPlaying
-                              ? 'bg-[#E04428] text-white border-[#E04428]'
-                              : 'bg-[#F5F2EB] text-[#171614] border-[#C9C1B2] hover:border-[#171614]'
-                          }`}
-                        >
-                          {isPlaying ? 'Stop' : 'Listen'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(item)}
-                          className="font-mono-tech text-[11px] font-semibold uppercase px-2.5 py-1.5 rounded border bg-[#F5F2EB] text-[#171614] border-[#C9C1B2] hover:border-[#171614] transition cursor-pointer"
-                        >
-                          {copiedId === item.id ? 'Copied' : 'Copy'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onEdit(item)}
-                          className="font-mono-tech text-[11px] font-semibold uppercase px-2.5 py-1.5 rounded border bg-[#F5F2EB] text-[#171614] border-[#C9C1B2] hover:border-[#171614] transition cursor-pointer"
-                        >
-                          Edit
-                        </button>
-
-                        {isConfirmingDelete ? (
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmDelete(item.id)}
-                              className="font-mono-tech text-[11px] font-semibold uppercase px-2.5 py-1.5 rounded bg-[#E04428] text-white border border-[#E04428] cursor-pointer"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="font-mono-tech text-[11px] font-semibold uppercase px-2 py-1.5 rounded bg-[#F5F2EB] text-[#656057] border border-[#C9C1B2] cursor-pointer"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(item.id)}
-                            className="font-mono-tech text-[11px] font-semibold uppercase px-2.5 py-1.5 rounded border bg-white text-[#B92D14] border-[#E8B8AF] hover:bg-[#FFF2EF] transition cursor-pointer"
+                      <div className="flex flex-wrap items-center gap-2 font-mono-lab text-[11px] text-slate-400">
+                        {scriptBadge && (
+                          <span
+                            className={`px-2 py-0.5 rounded-full border text-[10px] ${
+                              scriptBadge.tone === 'bilingual'
+                                ? 'bg-amber-400/10 text-amber-300 border-amber-400/25'
+                                : scriptBadge.tone === 'hindi'
+                                ? 'bg-cyan-400/10 text-cyan-300 border-cyan-400/25'
+                                : 'bg-white/[0.04] text-slate-300 border-white/10'
+                            }`}
                           >
-                            Delete
-                          </button>
+                            {scriptBadge.label}
+                          </span>
                         )}
+                        <span>{item.language_mode || 'Auto'}</span>
+                        <span>·</span>
+                        <span>{formatDuration(item.duration_seconds)}</span>
+                        <span>·</span>
+                        <span className="text-slate-500">{formatDate(item.created_at)}</span>
                       </div>
                     </div>
 
-                    <p className="transcript-font text-[14.5px] text-[#262420] leading-[1.75] whitespace-pre-wrap break-words border-t border-[#EFEAE0] pt-3">
-                      {item.content}
-                    </p>
-                  </article>
-                );
-              })
-            )}
-          </div>
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSpeak(item)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer ${
+                          isPlaying
+                            ? 'bg-rose-500/20 text-rose-200 border-rose-500/40 hover:bg-rose-500/30'
+                            : 'bg-white/[0.04] text-slate-200 border-white/10 hover:border-cyan-400/40 hover:text-cyan-200'
+                        }`}
+                      >
+                        {isPlaying ? 'Stop' : 'Listen'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(item)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white/[0.04] text-slate-200 border-white/10 hover:border-white/25 transition cursor-pointer"
+                      >
+                        {copiedId === item.id ? 'Copied' : 'Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white/[0.04] text-slate-200 border-white/10 hover:border-white/25 transition cursor-pointer"
+                      >
+                        Edit
+                      </button>
+
+                      {isConfirmingDelete ? (
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmDelete(item.id)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500 text-white hover:bg-rose-600 cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1.5 rounded-lg text-xs font-medium bg-white/[0.05] text-slate-400 border border-white/10 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(item.id)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-rose-500/10 text-rose-300 border-rose-500/25 hover:bg-rose-500/20 transition cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="transcript-font text-sm text-slate-300 leading-relaxed whitespace-pre-wrap break-words border-t border-white/[0.06] pt-3">
+                    {item.content}
+                  </p>
+                </article>
+              );
+            })
+          )}
         </div>
       </div>
     </section>
