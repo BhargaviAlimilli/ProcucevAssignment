@@ -95,15 +95,19 @@ export function attachTranscribeWebSocket(httpServer) {
 
           try {
             let activeSession = null;
+            const langHint =
+              Array.isArray(languageCodes) && languageCodes.length > 0
+                ? ` Expected spoken language hint: ${languageCodes.join(', ')}.`
+                : ' Automatically detect and transcribe multilingual or code-switched speech (such as Hindi and English).';
+
             activeSession = await ai.live.connect({
               model,
               config: {
                 responseModalities: [Modality.AUDIO],
-                inputAudioTranscription: {
-                  languageCodes: Array.isArray(languageCodes) ? languageCodes : [],
-                },
-                systemInstruction:
-                  'You are a silent transcription listener. Do not speak or interrupt; listen accurately to multilingual and code-switched speech.',
+                // Google AI Studio Gemini API rejects languageCodes when defined;
+                // passing {} enables automatic multilingual transcription & code-switching.
+                inputAudioTranscription: {},
+                systemInstruction: `You are a silent transcription listener. Never speak or interrupt; listen accurately to the user.${langHint}`,
               },
               callbacks: {
                 onopen: () => {
