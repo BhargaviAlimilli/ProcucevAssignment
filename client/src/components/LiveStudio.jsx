@@ -20,6 +20,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
   const [title, setTitle] = useState('');
   const [languageMode, setLanguageMode] = useState('Auto (Multilingual)');
   const [isRecording, setIsRecording] = useState(false);
+  const [connectionPhase, setConnectionPhase] = useState('idle'); // 'idle' | 'connecting' | 'ready' | 'error'
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [micLevel, setMicLevel] = useState(0);
   const [wsStatus, setWsStatus] = useState({ text: 'Standby', tone: 'neutral' });
@@ -33,6 +34,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
   const committedRef = useRef('');
   const interimRef = useRef('');
   const isRecordingRef = useRef(false);
+  const connectionPhaseRef = useRef('idle');
   const wsRef = useRef(null);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
@@ -155,7 +157,9 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
   function cleanupAudioAndSocket({ skipWsClose = false } = {}) {
     isRecordingRef.current = false;
+    connectionPhaseRef.current = 'idle';
     setIsRecording(false);
+    setConnectionPhase('idle');
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -218,6 +222,10 @@ export default function LiveStudio({ onSaved, onNotify }) {
     }
 
     try {
+      isRecordingRef.current = true;
+      connectionPhaseRef.current = 'connecting';
+      setIsRecording(true);
+      setConnectionPhase('connecting');
       setWsStatus({ text: 'Connecting...', tone: 'connecting' });
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -252,11 +260,22 @@ export default function LiveStudio({ onSaved, onNotify }) {
           const msg = JSON.parse(event.data);
           if (msg.type === 'status') {
             if (msg.status === 'ready') {
+              connectionPhaseRef.current = 'ready';
+              setConnectionPhase('ready');
               setWsStatus({ text: `Live · ${msg.model}`, tone: 'live' });
+              if (!timerRef.current && isRecordingRef.current) {
+                timerRef.current = setInterval(() => {
+                  setElapsedSeconds((prev) => prev + 1);
+                }, 1000);
+              }
             } else if (msg.status === 'connecting') {
+              connectionPhaseRef.current = 'connecting';
+              setConnectionPhase('connecting');
               setWsStatus({ text: 'Syncing Gemini...', tone: 'connecting' });
             } else if (msg.status === 'stopped' || msg.status === 'closed') {
               if (!isRecordingRef.current) {
+                connectionPhaseRef.current = 'idle';
+                setConnectionPhase('idle');
                 setWsStatus({ text: 'Standby', tone: 'neutral' });
               }
             }
@@ -285,6 +304,8 @@ export default function LiveStudio({ onSaved, onNotify }) {
               syncTextState(merged, '');
             }
           } else if (msg.type === 'error') {
+            connectionPhaseRef.current = 'error';
+            setConnectionPhase('error');
             setWsStatus({ text: 'Error', tone: 'error' });
             onNotify(msg.message || 'Transcription error occurred.', 'error');
           }
@@ -324,7 +345,10 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
       const handlePcmFrame = (float32Chunk) => {
         setMicLevel(calculateLevelPercent(float32Chunk));
-        if (ws.readyState === WebSocket.OPEN) {
+        if (
+          ws.readyState === WebSocket.OPEN &&
+          connectionPhaseRef.current === 'ready'
+        ) {
           const pcmBytes = downsampleTo16kPcm(float32Chunk, audioContext.sampleRate);
           ws.send(pcmBytes);
         }
@@ -354,9 +378,6 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
       isRecordingRef.current = true;
       setIsRecording(true);
-      timerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
     } catch (err) {
       console.error('Could not start microphone:', err);
       onNotify(err.message || 'Microphone access denied.', 'error');
@@ -481,8 +502,20 @@ export default function LiveStudio({ onSaved, onNotify }) {
         {/* Live Oscilloscope Waveform Bay */}
         <div className="obsidian-subpanel rounded-xl p-4 space-y-3.5 relative overflow-hidden">
           <div className="flex items-center justify-between text-[11px] font-mono-lab">
-            <span className={isRecording ? 'text-cyan-300' : 'text-slate-500'}>
-              {isRecording ? '● STREAMING 16kHz MONO' : '○ OSCILLOSCOPE IDLE'}
+            <span
+              className={
+                connectionPhase === 'ready'
+                  ? 'text-emerald-300'
+                  : connectionPhase === 'connecting'
+                  ? 'text-amber-300'
+                  : 'text-slate-500'
+              }
+            >
+              {connectionPhase === 'ready'
+                ? '● LISTENING LIVE · SPEAK NOW'
+                : connectionPhase === 'connecting'
+                ? '◌ CONNECTING TO GEMINI LIVE...'
+                : '○ OSCILLOSCOPE IDLE'}
             </span>
             <span className="text-slate-400">GAIN {micLevel}%</span>
           </div>
@@ -491,6 +524,38 @@ export default function LiveStudio({ onSaved, onNotify }) {
             <canvas ref={canvasRef} className="w-full h-full block" />
           </div>
 
+          {/* Clear Readiness Cue Banner */}
+          {isRecording && (
+            <div
+              className={`rounded-lg px-3 py-2 border text-xs flex items-center gap-2.5 transition-colors ${
+                connectionPhase === 'ready'
+                  ? 'bg-emerald-500/12 border-emerald-400/40 text-emerald-200'
+                  : 'bg-amber-500/12 border-amber-400/35 text-amber-200'
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  connectionPhase === 'ready'
+                    ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_#34D399]'
+                    : 'bg-amber-400 animate-ping'
+                }`}
+              />
+              <span>
+                {connectionPhase === 'ready' ? (
+                  <>
+                    <strong className="font-semibold text-emerald-100">Ready! Start speaking now</strong>{' '}
+                    — Gemini is listening live.
+                  </>
+                ) : (
+                  <>
+                    <strong className="font-semibold text-amber-100">Connecting speech engine...</strong>{' '}
+                    Please wait 1–2 seconds before speaking.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           {/* Transport Controls */}
           <div className="flex items-center justify-between gap-3 pt-0.5">
             <button
@@ -498,16 +563,26 @@ export default function LiveStudio({ onSaved, onNotify }) {
               onClick={isRecording ? () => cleanupAudioAndSocket() : startRecording}
               className={`inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition cursor-pointer ${
                 isRecording
-                  ? 'bg-rose-500 text-white hover:bg-rose-600 rec-pulse'
+                  ? connectionPhase === 'connecting'
+                    ? 'bg-amber-500 text-[#090B0E] hover:bg-amber-400'
+                    : 'bg-rose-500 text-white hover:bg-rose-600 rec-pulse'
                   : 'bg-cyan-400 text-[#090B0E] hover:bg-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.28)]'
               }`}
             >
               <span
                 className={`w-2.5 h-2.5 ${
-                  isRecording ? 'bg-white rounded-[2px]' : 'bg-[#090B0E] rounded-full'
+                  isRecording
+                    ? connectionPhase === 'connecting'
+                      ? 'bg-[#090B0E] rounded-full animate-pulse'
+                      : 'bg-white rounded-[2px]'
+                    : 'bg-[#090B0E] rounded-full'
                 }`}
               />
-              {isRecording ? 'Stop Microphone' : 'Start Microphone'}
+              {isRecording
+                ? connectionPhase === 'connecting'
+                  ? 'Connecting... (Cancel)'
+                  : 'Stop Microphone'
+                : 'Start Microphone'}
             </button>
 
             <div className="text-right">
@@ -622,8 +697,20 @@ export default function LiveStudio({ onSaved, onNotify }) {
             >
               {!hasText && (
                 <span className="text-slate-500 text-sm">
-                  Click <span className="text-cyan-300 font-medium">Start Microphone</span> and
-                  speak naturally in Hindi, English, or mixed Hinglish — live captions stream here.
+                  {connectionPhase === 'connecting' ? (
+                    <span className="text-amber-300/90">
+                      Connecting to Gemini Live API... Hold on a moment before speaking.
+                    </span>
+                  ) : connectionPhase === 'ready' ? (
+                    <span className="text-emerald-300/90">
+                      Connected and listening! Start speaking in Hindi, English, or mixed Hinglish...
+                    </span>
+                  ) : (
+                    <>
+                      Click <span className="text-cyan-300 font-medium">Start Microphone</span> and
+                      speak naturally in Hindi, English, or mixed Hinglish — live captions stream here.
+                    </>
+                  )}
                 </span>
               )}
               <span className="text-slate-100">{committedText}</span>
