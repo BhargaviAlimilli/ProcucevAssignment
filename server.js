@@ -6,6 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import { initDb, checkDbHealth } from './db.js';
 import transcriptionsRouter from './routes/transcriptions.js';
+import { attachTranscribeWebSocket } from './services/geminiLive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/transcriptions', transcriptionsRouter);
 
 const server = http.createServer(app);
+attachTranscribeWebSocket(server);
 
 async function startServer() {
   try {
