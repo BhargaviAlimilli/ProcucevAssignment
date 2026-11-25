@@ -3,24 +3,21 @@ import {
   PCM_WORKLET_CODE,
   appendSmartText,
   calculateLevelPercent,
+  computeSpectrumBars,
+  detectScriptBadge,
   downsampleTo16kPcm,
   formatDuration,
 } from '../utils/audio.js';
 
 const LANGUAGE_MODES = [
-  { label: 'Auto (Multilingual / Code-Switch)', value: 'Auto (Multilingual)', codes: [] },
-  { label: 'Hindi + English Hint', value: 'Hindi + English (hi-IN, en-IN)', codes: ['hi-IN', 'en-IN'] },
-  { label: 'Hindi (hi-IN)', value: 'Hindi (hi-IN)', codes: ['hi-IN'] },
-  { label: 'English India (en-IN)', value: 'English India (en-IN)', codes: ['en-IN'] },
-  { label: 'English US (en-US)', value: 'English US (en-US)', codes: ['en-US'] },
+  { short: 'AUTO', label: 'Auto (Multilingual)', value: 'Auto (Multilingual)', codes: [] },
+  { short: 'HI + EN', label: 'Hindi + English', value: 'Hindi + English (hi-IN, en-IN)', codes: ['hi-IN', 'en-IN'] },
+  { short: 'हिंदी', label: 'Hindi (hi-IN)', value: 'Hindi (hi-IN)', codes: ['hi-IN'] },
+  { short: 'EN-IN', label: 'English (IN)', value: 'English India (en-IN)', codes: ['en-IN'] },
+  { short: 'EN-US', label: 'English (US)', value: 'English US (en-US)', codes: ['en-US'] },
 ];
 
-const WS_TONE_CLASSES = {
-  neutral: 'bg-slate-100 text-slate-600',
-  connecting: 'bg-amber-100 text-amber-800',
-  live: 'bg-emerald-100 text-emerald-800',
-  error: 'bg-rose-100 text-rose-800',
-};
+const BAR_COUNT = 24;
 
 export default function LiveStudio({ onSaved, onNotify }) {
   const [title, setTitle] = useState('');
@@ -28,7 +25,8 @@ export default function LiveStudio({ onSaved, onNotify }) {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [micLevel, setMicLevel] = useState(0);
-  const [wsStatus, setWsStatus] = useState({ text: 'Idle', tone: 'neutral' });
+  const [spectrumBars, setSpectrumBars] = useState(() => new Array(BAR_COUNT).fill(6));
+  const [wsStatus, setWsStatus] = useState({ text: 'STANDBY', tone: 'neutral' });
 
   const [committedText, setCommittedText] = useState('');
   const [interimText, setInterimText] = useState('');
@@ -41,6 +39,8 @@ export default function LiveStudio({ onSaved, onNotify }) {
   const isRecordingRef = useRef(false);
   const wsRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const rafRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const sourceNodeRef = useRef(null);
   const workletNodeRef = useRef(null);
@@ -68,10 +68,23 @@ export default function LiveStudio({ onSaved, onNotify }) {
     setInterimText(nextInterim);
   }
 
+  function startSpectrumLoop() {
+    const tick = () => {
+      if (!isRecordingRef.current) return;
+      setSpectrumBars(computeSpectrumBars(analyserRef.current, BAR_COUNT));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
   function cleanupAudioAndSocket({ skipWsClose = false } = {}) {
     isRecordingRef.current = false;
     setIsRecording(false);
 
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -89,6 +102,10 @@ export default function LiveStudio({ onSaved, onNotify }) {
     if (scriptNodeRef.current) {
       scriptNodeRef.current.disconnect();
       scriptNodeRef.current = null;
+    }
+    if (analyserRef.current) {
+      analyserRef.current.disconnect();
+      analyserRef.current = null;
     }
     if (sourceNodeRef.current) {
       sourceNodeRef.current.disconnect();
@@ -112,7 +129,8 @@ export default function LiveStudio({ onSaved, onNotify }) {
     }
 
     setMicLevel(0);
-    setWsStatus({ text: 'Idle', tone: 'neutral' });
+    setSpectrumBars(new Array(BAR_COUNT).fill(6));
+    setWsStatus({ text: 'STANDBY', tone: 'neutral' });
   }
 
   async function startRecording() {
@@ -129,7 +147,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
     }
 
     try {
-      setWsStatus({ text: 'Connecting...', tone: 'connecting' });
+      setWsStatus({ text: 'LINKING...', tone: 'connecting' });
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -163,12 +181,12 @@ export default function LiveStudio({ onSaved, onNotify }) {
           const msg = JSON.parse(event.data);
           if (msg.type === 'status') {
             if (msg.status === 'ready') {
-              setWsStatus({ text: `Live (${msg.model})`, tone: 'live' });
+              setWsStatus({ text: `ON AIR · ${msg.model}`, tone: 'live' });
             } else if (msg.status === 'connecting') {
-              setWsStatus({ text: 'Connecting Gemini...', tone: 'connecting' });
+              setWsStatus({ text: 'SYNCING MODEL...', tone: 'connecting' });
             } else if (msg.status === 'stopped' || msg.status === 'closed') {
               if (!isRecordingRef.current) {
-                setWsStatus({ text: 'Idle', tone: 'neutral' });
+                setWsStatus({ text: 'STANDBY', tone: 'neutral' });
               }
             }
           } else if (msg.type === 'transcript') {
@@ -196,7 +214,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
               syncTextState(merged, '');
             }
           } else if (msg.type === 'error') {
-            setWsStatus({ text: 'Error', tone: 'error' });
+            setWsStatus({ text: 'FAULT', tone: 'error' });
             onNotify(msg.message || 'Transcription error occurred.', 'error');
           }
         } catch (err) {
@@ -205,7 +223,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
       };
 
       ws.onerror = () => {
-        setWsStatus({ text: 'WS Error', tone: 'error' });
+        setWsStatus({ text: 'LINK ERR', tone: 'error' });
         onNotify('WebSocket connection error.', 'error');
       };
 
@@ -213,7 +231,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
         if (isRecordingRef.current) {
           cleanupAudioAndSocket({ skipWsClose: true });
         } else {
-          setWsStatus({ text: 'Idle', tone: 'neutral' });
+          setWsStatus({ text: 'STANDBY', tone: 'neutral' });
         }
       };
 
@@ -226,6 +244,12 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
       const sourceNode = audioContext.createMediaStreamSource(stream);
       sourceNodeRef.current = sourceNode;
+
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.72;
+      sourceNode.connect(analyser);
+      analyserRef.current = analyser;
 
       const handlePcmFrame = (float32Chunk) => {
         setMicLevel(calculateLevelPercent(float32Chunk));
@@ -259,6 +283,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
       isRecordingRef.current = true;
       setIsRecording(true);
+      startSpectrumLoop();
       timerRef.current = setInterval(() => {
         setElapsedSeconds((prev) => prev + 1);
       }, 1000);
@@ -271,7 +296,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
   function handleToggleEdit() {
     if (isRecording) {
-      onNotify('Stop recording before manually editing text.', 'info');
+      onNotify('Stop capture before manually editing the script.', 'info');
       return;
     }
 
@@ -303,7 +328,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
     ).trim();
 
     if (!content) {
-      onNotify('Record or enter a transcript before saving.', 'error');
+      onNotify('Record or enter a transcript before archiving.', 'error');
       return;
     }
 
@@ -313,7 +338,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim() || 'Untitled Transcript',
+          title: title.trim() || 'Untitled Tape',
           content,
           language_mode: languageMode,
           duration_seconds: elapsedSeconds,
@@ -324,7 +349,7 @@ export default function LiveStudio({ onSaved, onNotify }) {
         throw new Error(data.error || 'Failed to save transcript.');
       }
 
-      onNotify('Transcription saved to PostgreSQL!', 'success');
+      onNotify('Archived to Neon PostgreSQL!', 'success');
       setTitle('');
       syncTextState('', '');
       setEditDraft('');
@@ -338,6 +363,13 @@ export default function LiveStudio({ onSaved, onNotify }) {
     }
   }
 
+  const fullDisplayText = isEditing
+    ? editDraft
+    : appendSmartText(committedText, interimText);
+  const wordCount = fullDisplayText.trim()
+    ? fullDisplayText.trim().split(/\s+/).length
+    : 0;
+  const scriptBadge = detectScriptBadge(fullDisplayText);
   const hasText = Boolean(committedText || interimText);
   const showInterimSpace =
     Boolean(committedText && interimText) &&
@@ -346,28 +378,109 @@ export default function LiveStudio({ onSaved, onNotify }) {
 
   return (
     <section className="lg:col-span-5 space-y-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-5">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Live Transcription Studio</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Speak naturally — switch between Hindi, English &amp; 90+ languages mid-sentence.
-            </p>
+      <div className="editorial-card rounded-xl overflow-hidden">
+        {/* Top Deck Bar */}
+        <div className="px-5 py-3.5 border-b border-[#D6CFC2] bg-[#FAF7F0] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="font-mono-tech text-[11px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded bg-[#171614] text-[#FDFBF7]">
+              DECK A
+            </span>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-[#171614]">
+              Live Capture Console
+            </h2>
           </div>
+
           <span
-            className={`px-2.5 py-1 rounded-full text-xs font-medium shrink-0 ${
-              WS_TONE_CLASSES[wsStatus.tone] || WS_TONE_CLASSES.neutral
+            className={`font-mono-tech text-[11px] font-semibold tracking-wider px-2.5 py-0.5 rounded-full border ${
+              wsStatus.tone === 'live'
+                ? 'bg-[#E04428]/10 text-[#E04428] border-[#E04428]/40'
+                : wsStatus.tone === 'connecting'
+                ? 'bg-amber-500/15 text-amber-800 border-amber-500/40'
+                : wsStatus.tone === 'error'
+                ? 'bg-red-500/15 text-red-700 border-red-500/40'
+                : 'bg-[#EDE8DD] text-[#656057] border-[#D6CFC2]'
             }`}
           >
             {wsStatus.text}
           </span>
         </div>
 
-        {/* Session Title & Language Mode */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-5 space-y-5">
+          {/* Dark Hardware Telemetry & Spectrum Analyzer */}
+          <div className="rounded-lg bg-[#171614] text-[#F5F2EB] p-4 border border-[#171614] space-y-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    isRecording
+                      ? 'bg-[#E04428] on-air-dot shadow-[0_0_10px_#E04428]'
+                      : 'bg-[#4E4A42]'
+                  }`}
+                />
+                <span className="font-mono-tech text-xs tracking-widest uppercase text-[#CFC8BA]">
+                  {isRecording ? 'ON AIR · CAPTURING 16kHz PCM' : 'MIC STANDBY · READY'}
+                </span>
+              </div>
+
+              <div className="font-mono-tech text-2xl font-semibold tracking-tight tabular-nums text-[#FDFBF7]">
+                {formatDuration(elapsedSeconds)}
+              </div>
+            </div>
+
+            {/* 24-Bar Real-Time Spectrum Meter */}
+            <div className="h-14 bg-[#0E0D0C] rounded-md px-2.5 py-2 border border-[#2C2A25] flex items-end gap-1">
+              {spectrumBars.map((heightPct, idx) => {
+                const isPeak = heightPct > 72;
+                const isMid = heightPct > 42 && heightPct <= 72;
+                const barColor = !isRecording
+                  ? 'bg-[#2E2B26]'
+                  : isPeak
+                  ? 'bg-[#E04428]'
+                  : isMid
+                  ? 'bg-[#E89B3C]'
+                  : 'bg-[#4ADE80]';
+                return (
+                  <div
+                    key={idx}
+                    style={{ height: `${isRecording ? heightPct : 10}%` }}
+                    className={`flex-1 rounded-[2px] transition-all duration-75 ${barColor}`}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-0.5">
+              <button
+                type="button"
+                onClick={isRecording ? () => cleanupAudioAndSocket() : startRecording}
+                className={`tactile-btn inline-flex items-center gap-2.5 px-4 py-2.5 rounded-md font-display text-xs font-bold uppercase tracking-wider cursor-pointer border ${
+                  isRecording
+                    ? 'bg-[#E04428] text-white border-[#FF7B63] shadow-[3px_3px_0px_#000000]'
+                    : 'bg-[#FDFBF7] text-[#171614] border-[#FDFBF7] hover:bg-[#EDE8DD] shadow-[3px_3px_0px_#4A463E]'
+                }`}
+              >
+                <span
+                  className={`w-2.5 h-2.5 ${
+                    isRecording ? 'bg-white rounded-[2px]' : 'bg-[#E04428] rounded-full'
+                  }`}
+                />
+                {isRecording ? 'Stop Capture' : 'Start Microphone'}
+              </button>
+
+              <div className="font-mono-tech text-[11px] text-[#9E978B] text-right">
+                <div>INPUT GAIN: {micLevel}%</div>
+                <div>FORMAT: PCM16 MONO</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Session Title */}
           <div>
-            <label htmlFor="sessionTitle" className="block text-xs font-medium text-slate-600 mb-1">
-              Session Title
+            <label
+              htmlFor="sessionTitle"
+              className="block font-mono-tech text-[11px] font-semibold uppercase tracking-wider text-[#656057] mb-1.5"
+            >
+              Tape Title / Session Label
             </label>
             <input
               id="sessionTitle"
@@ -375,144 +488,142 @@ export default function LiveStudio({ onSaved, onNotify }) {
               maxLength={255}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Hinglish Product Standup"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="e.g., Delhi Client Sync — Hinglish Notes"
+              className="w-full rounded-md border border-[#C9C1B2] bg-[#FFFFFF] px-3 py-2 text-sm text-[#171614] placeholder:text-[#A39C8F] focus:outline-none focus:border-[#171614] focus:ring-1 focus:ring-[#171614]"
             />
           </div>
+
+          {/* Tactile Language Mode Pills */}
           <div>
-            <label htmlFor="languageMode" className="block text-xs font-medium text-slate-600 mb-1">
-              Language Mode
-            </label>
-            <select
-              id="languageMode"
-              value={languageMode}
-              disabled={isRecording}
-              onChange={(e) => setLanguageMode(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
-            >
-              {LANGUAGE_MODES.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-mono-tech text-[11px] font-semibold uppercase tracking-wider text-[#656057]">
+                Recognition Mode
+              </span>
+              <span className="font-mono-tech text-[10px] text-[#857F74]">
+                {languageMode}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {LANGUAGE_MODES.map((m) => {
+                const active = languageMode === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    disabled={isRecording}
+                    onClick={() => setLanguageMode(m.value)}
+                    title={m.label}
+                    className={`font-mono-tech text-[11px] font-medium px-2.5 py-1.5 rounded-md border transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      active
+                        ? 'bg-[#171614] text-[#FDFBF7] border-[#171614]'
+                        : 'bg-[#F5F2EB] text-[#49453E] border-[#D6CFC2] hover:border-[#171614]'
+                    }`}
+                  >
+                    {m.short}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Microphone Controls + Timer + Level Meter */}
-        <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={isRecording ? () => cleanupAudioAndSocket() : startRecording}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition shadow-sm cursor-pointer ${
-                isRecording
-                  ? 'bg-rose-600 hover:bg-rose-700 recording-active'
-                  : 'bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99]'
-              }`}
-            >
-              <span
-                className={`w-2.5 h-2.5 bg-white ${
-                  isRecording ? 'rounded-sm' : 'rounded-full'
-                }`}
+          {/* Editorial Script Sheet */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono-tech text-[11px] font-semibold uppercase tracking-wider text-[#656057]">
+                  Live Script Sheet
+                </span>
+                {scriptBadge && (
+                  <span
+                    className={`font-mono-tech text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                      scriptBadge.tone === 'bilingual'
+                        ? 'bg-[#E04428]/10 text-[#B92D14] border-[#E04428]/30'
+                        : scriptBadge.tone === 'hindi'
+                        ? 'bg-amber-500/15 text-amber-900 border-amber-500/30'
+                        : 'bg-[#EDE8DD] text-[#49453E] border-[#D6CFC2]'
+                    }`}
+                  >
+                    {scriptBadge.label}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="font-mono-tech text-[11px] text-[#857F74]">
+                  {wordCount} {wordCount === 1 ? 'WORD' : 'WORDS'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleEdit}
+                  className="font-mono-tech text-[11px] font-semibold uppercase tracking-wider text-[#171614] underline underline-offset-4 hover:text-[#E04428] cursor-pointer"
+                >
+                  {isEditing ? 'Done Editing' : 'Edit Script'}
+                </button>
+              </div>
+            </div>
+
+            {isEditing ? (
+              <textarea
+                rows={8}
+                value={editDraft}
+                onChange={(e) => setEditDraft(e.target.value)}
+                placeholder="Refine your multilingual script before saving..."
+                className="transcript-font w-full rounded-md border-2 border-[#171614] bg-white p-4 text-[15px] leading-relaxed text-[#171614] focus:outline-none"
               />
-              <span>{isRecording ? 'Stop Microphone' : 'Start Microphone'}</span>
-            </button>
-
-            <div className="text-right">
-              <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
-                Duration
-              </div>
-              <div className="text-lg font-mono font-semibold text-slate-800">
-                {formatDuration(elapsedSeconds)}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[11px] text-slate-500">
-              <span>Input Audio Level (16kHz PCM)</span>
-              <span>{micLevel}%</span>
-            </div>
-            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+            ) : (
               <div
-                style={{ width: `${micLevel}%` }}
-                className="h-full bg-gradient-to-r from-emerald-500 via-indigo-500 to-rose-500 transition-all duration-75"
-              />
-            </div>
+                ref={displayBoxRef}
+                className="transcript-font transcript-scroll min-h-[210px] max-h-[310px] overflow-y-auto rounded-md border border-[#C9C1B2] bg-[#FFFFFF] p-4 pl-5 text-[15px] leading-[1.8] text-[#171614] whitespace-pre-wrap relative"
+                style={{
+                  borderLeft: '4px solid #E04428',
+                }}
+              >
+                {!hasText && (
+                  <span className="text-[#9E978B] text-sm">
+                    Press <strong className="font-semibold text-[#171614]">Start Microphone</strong>{' '}
+                    and speak naturally. Switch mid-sentence between Hindi (e.g., &ldquo;Kal subah
+                    meeting schedule karni hai&rdquo;) and English — words stream live here.
+                  </span>
+                )}
+                <span className="text-[#171614]">{committedText}</span>
+                {interimText && (
+                  <span className="bg-amber-100/90 text-[#8F3F00] px-1 rounded-xs border-b-2 border-[#C26A1B]">
+                    {showInterimSpace ? ` ${interimText}` : interimText}
+                  </span>
+                )}
+                {isRecording && (
+                  <span className="inline-block w-0.5 h-4 bg-[#E04428] align-middle ml-1 on-air-dot" />
+                )}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Live Transcript Box */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-600">Live Transcript</span>
+          {/* Deck Footer Actions */}
+          <div className="flex items-center justify-between gap-3 pt-1">
             <button
               type="button"
-              onClick={handleToggleEdit}
-              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 cursor-pointer"
+              onClick={handleClear}
+              className="tactile-btn font-mono-tech text-xs font-semibold uppercase tracking-wider px-4 py-2.5 rounded-md border border-[#C9C1B2] bg-[#F5F2EB] text-[#171614] hover:bg-[#EAE4D7] cursor-pointer"
             >
-              {isEditing ? 'Done Editing' : 'Edit Text'}
+              Reset Tape
+            </button>
+
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleSave}
+              className="tactile-btn inline-flex items-center gap-2 font-display text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-md border border-[#171614] bg-[#176B3A] text-[#FDFBF7] hover:bg-[#135830] shadow-[3px_3px_0px_#171614] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
+                />
+              </svg>
+              {isSaving ? 'Archiving...' : 'Archive to DB'}
             </button>
           </div>
-
-          {isEditing ? (
-            <textarea
-              rows={8}
-              value={editDraft}
-              onChange={(e) => setEditDraft(e.target.value)}
-              placeholder="Edit your transcript before saving..."
-              className="transcript-font w-full rounded-xl border border-indigo-300 bg-white p-4 text-sm leading-relaxed text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          ) : (
-            <div
-              ref={displayBoxRef}
-              className="transcript-font transcript-scroll min-h-[200px] max-h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap"
-            >
-              {!hasText && (
-                <span className="text-slate-400">
-                  Click &quot;Start Microphone&quot; and start speaking. Your real-time multilingual
-                  transcription will appear here...
-                </span>
-              )}
-              <span className="text-slate-900">{committedText}</span>
-              {interimText && (
-                <span className="text-indigo-600 bg-indigo-50/90 rounded px-1 italic">
-                  {showInterimSpace ? ` ${interimText}` : interimText}
-                </span>
-              )}
-              {isRecording && (
-                <span className="inline-block w-0.5 h-4 bg-indigo-600 align-middle ml-0.5 animate-pulse" />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Studio Action Buttons */}
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <button
-            type="button"
-            onClick={handleClear}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
-          >
-            Clear
-          </button>
-
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={handleSave}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm cursor-pointer"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
-              />
-            </svg>
-            {isSaving ? 'Saving...' : 'Save to Database'}
-          </button>
         </div>
       </div>
     </section>

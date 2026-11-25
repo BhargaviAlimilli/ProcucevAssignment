@@ -4,9 +4,9 @@ import HistoryDashboard from './components/HistoryDashboard.jsx';
 import EditModal from './components/EditModal.jsx';
 
 const TOAST_PALETTE = {
-  info: 'bg-slate-900 text-white',
-  success: 'bg-emerald-600 text-white',
-  error: 'bg-rose-600 text-white',
+  info: 'bg-[#171614] text-[#FDFBF7] border-[#171614]',
+  success: 'bg-[#176B3A] text-[#FDFBF7] border-[#171614]',
+  error: 'bg-[#E04428] text-[#FDFBF7] border-[#171614]',
 };
 
 export default function App() {
@@ -76,7 +76,7 @@ export default function App() {
         throw new Error(data.error || 'Failed to update transcript.');
       }
       setEditingItem(null);
-      notify('Transcription updated!', 'success');
+      notify('Archived transcript updated.', 'success');
       await fetchTranscriptions(searchQuery);
     } catch (err) {
       notify(err.message, 'error');
@@ -90,7 +90,7 @@ export default function App() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to delete transcript.');
       }
-      notify('Transcription deleted.', 'success');
+      notify('Transcript removed from archive.', 'success');
       await fetchTranscriptions(searchQuery);
     } catch (err) {
       notify(err.message, 'error');
@@ -98,69 +98,75 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* Top Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-                />
+    <div className="min-h-screen flex flex-col">
+      {/* Architectural Studio Header */}
+      <header className="bg-[#FDFBF7] border-b-2 border-[#171614] sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            {/* Custom Tape-Reel Emblem */}
+            <div className="w-10 h-10 rounded-md bg-[#171614] text-[#FDFBF7] flex items-center justify-center shadow-[2px_2px_0px_#E04428]">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="8" cy="12" r="3" />
+                <circle cx="16" cy="12" r="3" />
+                <path strokeLinecap="round" d="M8 15h8M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">
-                VaaniStream
-              </h1>
-              <p className="text-xs text-slate-500 hidden sm:block">
-                Real-Time Multilingual STT &amp; Code-Switching Dashboard
+              <div className="flex items-center gap-2">
+                <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight text-[#171614]">
+                  VAANISTREAM
+                </h1>
+                <span className="font-mono-tech text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#E04428]/10 text-[#B92D14] border border-[#E04428]/30">
+                  CODE-SWITCH STT
+                </span>
+              </div>
+              <p className="font-mono-tech text-[11px] text-[#656057] hidden sm:block">
+                MULTILINGUAL BROADCAST TRANSCRIPTION CONSOLE · HI / EN / 90+ LANGUAGES
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-medium">
+          {/* Live System Telemetry Badges */}
+          <div className="flex flex-wrap items-center gap-2 font-mono-tech text-[11px] font-medium">
             {!health ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                Checking...
+              <span className="px-2.5 py-1 rounded border border-[#D6CFC2] bg-[#F5F2EB] text-[#656057]">
+                TELEMETRY: PROBING...
               </span>
             ) : health.offline ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700">
-                Server Offline
+              <span className="px-2.5 py-1 rounded border border-[#E04428] bg-[#E04428]/10 text-[#B92D14]">
+                SERVER: OFFLINE
               </span>
             ) : (
               <>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border ${
                     health.db === 'connected'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-amber-50 text-amber-700'
+                      ? 'bg-[#176B3A]/10 text-[#176B3A] border-[#176B3A]/35'
+                      : 'bg-amber-500/15 text-amber-900 border-amber-500/40'
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      health.db === 'connected' ? 'bg-emerald-500' : 'bg-amber-500'
+                      health.db === 'connected' ? 'bg-[#176B3A]' : 'bg-amber-600'
                     }`}
                   />
-                  {health.db === 'connected' ? 'DB: Connected' : 'DB: Not Configured'}
+                  {health.db === 'connected' ? 'NEON DB: ONLINE' : 'NEON DB: UNSET'}
                 </span>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border ${
                     health.geminiConfigured
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'bg-rose-50 text-rose-700'
+                      ? 'bg-[#171614] text-[#FDFBF7] border-[#171614]'
+                      : 'bg-[#E04428]/10 text-[#B92D14] border-[#E04428]/40'
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      health.geminiConfigured ? 'bg-indigo-500' : 'bg-rose-500'
+                      health.geminiConfigured ? 'bg-[#4ADE80]' : 'bg-[#E04428]'
                     }`}
                   />
-                  {health.geminiConfigured ? health.model || 'Gemini Live' : 'Gemini Key Missing'}
+                  {health.geminiConfigured
+                    ? `ENGINE: ${health.model || 'gemini-3.8-live'}`
+                    : 'GEMINI KEY: MISSING'}
                 </span>
               </>
             )}
@@ -168,7 +174,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <LiveStudio
           onSaved={() => fetchTranscriptions(searchQuery)}
           onNotify={notify}
@@ -193,12 +199,12 @@ export default function App() {
         onSave={handleUpdate}
       />
 
-      {/* Toast Notifications */}
+      {/* Editorial Toast Notifications */}
       <div className="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium ${
+            className={`pointer-events-auto px-4 py-2.5 rounded-md border shadow-[3px_3px_0px_#171614] font-mono-tech text-xs font-medium ${
               TOAST_PALETTE[t.type] || TOAST_PALETTE.info
             }`}
           >

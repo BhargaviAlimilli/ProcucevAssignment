@@ -54,7 +54,25 @@ export function calculateLevelPercent(float32Samples) {
     sumSq += float32Samples[i] * float32Samples[i];
   }
   const rms = Math.sqrt(sumSq / Math.max(1, float32Samples.length));
-  return Math.min(100, Math.round(rms * 350));
+  return Math.min(100, Math.round(rms * 360));
+}
+
+export function computeSpectrumBars(analyser, barCount = 24) {
+  if (!analyser) return new Array(barCount).fill(6);
+  const freqData = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(freqData);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
+  const bars = [];
+  for (let i = 0; i < barCount; i++) {
+    let sum = 0;
+    const start = i * step;
+    for (let j = 0; j < step; j++) {
+      sum += freqData[start + j] || 0;
+    }
+    const avg = sum / step;
+    bars.push(Math.max(8, Math.min(100, Math.round((avg / 255) * 100))));
+  }
+  return bars;
 }
 
 export function formatDuration(totalSeconds) {
@@ -69,4 +87,25 @@ export function appendSmartText(existing, addition) {
   if (!existing) return addition.trimStart();
   const needsSpace = !/\s$/.test(existing) && !/^[\s.,!?;:।]/.test(addition);
   return needsSpace ? `${existing} ${addition}` : `${existing}${addition}`;
+}
+
+/**
+ * Inspects Unicode script ranges to identify Hindi (Devanagari), English (Latin),
+ * or Bilingual Code-Switched transcripts.
+ */
+export function detectScriptBadge(text) {
+  if (!text || !text.trim()) return null;
+  const hasDevanagari = /[\u0900-\u097F]/.test(text);
+  const hasLatin = /[A-Za-z]/.test(text);
+
+  if (hasDevanagari && hasLatin) {
+    return { label: 'BILINGUAL · HI + EN', tone: 'bilingual' };
+  }
+  if (hasDevanagari) {
+    return { label: 'DEVANAGARI · HI', tone: 'hindi' };
+  }
+  if (hasLatin) {
+    return { label: 'LATIN · EN', tone: 'english' };
+  }
+  return { label: 'MULTILINGUAL', tone: 'neutral' };
 }
