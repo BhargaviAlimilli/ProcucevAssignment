@@ -3,7 +3,7 @@ services:
     name: vaanistream-multilingual-stt
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:

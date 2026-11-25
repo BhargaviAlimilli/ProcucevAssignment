@@ -8,7 +8,7 @@ A full-stack, 100% free-tier web application for **real-time multilingual speech
 
 ```text
 +-------------------------------------------------------------------+
-|  Browser (public/index.html, public/app.js, Tailwind CDN)         |
+|  Browser (React + Vite + Tailwind CSS, client/src/*)               |
 |  - Mic Capture -> Web Audio API (16kHz, 16-bit mono PCM)          |
 |  - Real-Time Transcript View (interim vs. committed text)         |
 |  - CRUD Dashboard + Browser TTS (window.speechSynthesis)          |
@@ -18,7 +18,7 @@ A full-stack, 100% free-tier web application for **real-time multilingual speech
                                 v
 +-------------------------------------------------------------------+
 |  Node.js + Express + ws Server (server.js)                        |
-|  - Static UI serving (single origin, zero CORS/mixed-content)     |
+|  - Serves built React bundle from client/dist (single origin)     |
 |  - REST API: /api/health, /api/transcriptions (GET/POST/PUT/DEL)  |
 |  - WebSocket Audio Bridge (services/geminiLive.js)                |
 +----------------+-------------------------------+------------------+
@@ -37,6 +37,7 @@ A full-stack, 100% free-tier web application for **real-time multilingual speech
 
 ## Free-Tier Tech Stack
 
+- **Frontend:** React 19, Vite, Tailwind CSS (`client/`), built into `client/dist/`
 - **Runtime & Backend:** Node.js (v20+), Express, `ws`, `pg`, `dotenv`, `cors`
 - **Real-Time Multilingual STT:** `@google/genai` connecting to the **Gemini Live API** (`gemini-3.8-live` with configurable fallback via `GEMINI_LIVE_MODEL`) using `inputAudioTranscription: { languageCodes: [] }`
 - **Database:** **Neon** (`neon.tech`) permanent free-tier serverless PostgreSQL (0.5 GB, no credit card)
@@ -60,24 +61,27 @@ A full-stack, 100% free-tier web application for **real-time multilingual speech
 
 ### 3. Local Development
 ```bash
-# 1. Install dependencies
+# 1. Install root + client dependencies and build the React frontend
 npm install
+npm run build
 
 # 2. Configure environment variables
 cp .env.example .env
 # Edit .env with your DATABASE_URL and GEMINI_API_KEY
 
-# 3. Start the server
+# 3. Start the production-like server (serves client/dist + API + WS on :3000)
 npm start
-# Or with auto-reload during development:
+
+# Or run backend + Vite HMR dev server separately in two terminals:
 npm run dev
+npm run dev:client
 ```
-Open `http://localhost:3000` in Chrome or Edge and allow microphone access.
+Open `http://localhost:3000` (production build) or `http://localhost:5173` (Vite dev server with `/api` & `/ws` proxy) in Chrome or Edge and allow microphone access.
 
 ### 4. Deploy to Render (`render.yaml`)
 1. Push this repository to GitHub.
 2. In the [Render Dashboard](https://dashboard.render.com/), click **New +** -> **Blueprint** (or **Web Service**).
-3. Select your repository—Render detects `render.yaml` (`buildCommand: npm install`, `startCommand: npm start`, `healthCheckPath: /api/health`).
+3. Select your repository—Render detects `render.yaml` (`buildCommand: npm install && npm run build`, `startCommand: npm start`, `healthCheckPath: /api/health`).
 4. Set the secret environment variables in Render:
    - `DATABASE_URL` (your Neon connection string)
    - `GEMINI_API_KEY` (your Google AI Studio API key)
